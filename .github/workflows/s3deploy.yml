@@ -1,5 +1,5 @@
 
-name: Deploy to S3 and Invalidate CloudFront
+name: Deploy to S3 bucket
 
 on:
   push:
