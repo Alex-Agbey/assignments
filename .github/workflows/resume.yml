@@ -1,0 +1,42 @@
+name: Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_APP_NAME: resume-app
+  AWS_ENV_NAME: resume-app-env
+
+permissions:
+  id-token: write   # Required for OIDC token generation
+  contents: read    # Required for actions/checkout
+
+jobs:
+  deploy:
+    name: Deploy to Elastic Beanstalk
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Zip application files
+        run: zip -r application.zip . -x "*.git*"
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          region: ${{ secrets.AWS_REGION }}
+          application_name: ${{ env.AWS_APP_NAME }}
+          environment_name: ${{ env.AWS_ENV_NAME }}
+          version_label: v-${{ github.run_number }}
+          existing_bucket_name: ${{ secrets.EB_BUCKET_NAME }}
+          deployment_package: application.zip
