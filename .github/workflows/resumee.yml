@@ -1,4 +1,4 @@
-name: Deploy to Elastic Beanstalks
+name: Deploy to Elastic Beanstalkss
 
 on:
   push:
