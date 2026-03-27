@@ -1,4 +1,4 @@
-name: Deploy to Elastic Beanstalks
+name: Deploy to Elastic Beanstalk
 
 on:
   push:
@@ -10,8 +10,8 @@ env:
   AWS_ENV_NAME: resume-app-env
 
 permissions:
-  id-token: write   # Required for OIDC token generation
-  contents: read    # Required for actions/checkout
+  id-token: write
+  contents: read
 
 jobs:
   deploy:
@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -31,12 +31,26 @@ jobs:
       - name: Zip application files
         run: zip -r application.zip . -x "*.git*"
 
-      - name: Deploy to Elastic Beanstalk
-        uses: einaregilsson/beanstalk-deploy@v22
-        with:
-          region: ${{ secrets.AWS_REGION }}
-          application_name: ${{ env.AWS_APP_NAME }}
-          environment_name: ${{ env.AWS_ENV_NAME }}
-          version_label: v-${{ github.run_number }}
-          existing_bucket_name: ${{ secrets.EB_BUCKET_NAME }}
-          deployment_package: application.zip
+      - name: Upload zip to S3
+        run: |
+          aws s3 cp application.zip s3://${{ secrets.EB_BUCKET_NAME }}/resume-app/application-v${{ github.run_number }}.zip
+
+      - name: Create new Elastic Beanstalk version
+        run: |
+          aws elasticbeanstalk create-application-version \
+            --application-name ${{ env.AWS_APP_NAME }} \
+            --version-label v-${{ github.run_number }} \
+            --source-bundle S3Bucket=${{ secrets.EB_BUCKET_NAME }},S3Key=resume-app/application-v${{ github.run_number }}.zip
+
+      - name: Deploy to Elastic Beanstalk environment
+        run: |
+          aws elasticbeanstalk update-environment \
+            --application-name ${{ env.AWS_APP_NAME }} \
+            --environment-name ${{ env.AWS_ENV_NAME }} \
+            --version-label v-${{ github.run_number }}
+
+      - name: Wait for deployment to complete
+        run: |
+          aws elasticbeanstalk wait environment-updated \
+            --application-name ${{ env.AWS_APP_NAME }} \
+            --environment-name ${{ env.AWS_ENV_NAME }}
